@@ -218,7 +218,8 @@ function prepare-tests () {
     local master_ip=$(openstack server show ${LINUX_NODES[0]} | grep address | awk '{print $4}'); master_ip=${master_ip#*=}; master_ip=${master_ip%,}
 
     scp -i $PRIVATE_KEY -r run-e2e/ $ansible_ip:~/
-    ssh -i $PRIVATE_KEY $ansible_ip "cat | bash /dev/stdin --k8s-master-ip $master_ip --id-rsa ~/id_rsa" < prepare-tests.sh
+    ssh -i $PRIVATE_KEY $ansible_ip "cat | bash /dev/stdin --k8s-master-ip $master_ip \
+        --id-rsa ~/id_rsa --linux-node ${LINUX_NODES[1]}" < prepare-tests.sh
 }
 
 function main() {

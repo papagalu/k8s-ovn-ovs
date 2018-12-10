@@ -7,6 +7,7 @@ set -o pipefail
 
 K8S_MASTER_IP=""
 ID_RSA=""
+LINUX_NODE=""
 
 function configure-kubectl () {
     mkdir -p scp
@@ -24,35 +25,26 @@ function configure-kubectl () {
     sudo chmod 0644 /etc/kubernetes/tls/*
 }
 
-function program-is-installed() {
+function program-is-installed () {
     local return_=1
     type $1 >/dev/null 2>&1 || { local return_=0; }
     echo "$return_"
 }
 
-function install-docker(){
-    if [[ $(program_is_installed docker) != "1" ]]; then
-        echo "Installing docker"
-        DEBIAN_FRONTEND=noninteractive sudo apt-get install docker.io -y
-
-        echo "Adding user $USER to docker group"
-        sudo usermod -a -G docker $USER
-    fi
-}
-
 function build-k8s-parts () {
-    sudo run-e2e/kubernetes/build/run.sh make WHAT="test/e2e/e2e.test  cmd/kubectl vendor/github.com/onsi/ginkgo/ginkgo"
+    pushd ~/go/src/k8s.io/kubernetes
+        git checkout master --force
+        sudo ./build/run.sh make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo"
+    popd
 }
 
-function build-kubetest () {
-    if [[ ! -d test-infra ]]; then
-        git clone https://github.com/e2e-win/test-infra.git
-    fi
-    pushd test-infra
-        export PATH="$PATH:$HOME/bin"
-        bazel build //kubetest
-        sudo cp bazel-bin/kubetest/linux_amd64_stripped/kubetest /usr/bin
-    popd
+function get-kubetest () {
+    source ~/.bashrc
+    export GOROOT=/usr/lib/go
+    export GOBIN=/usr/lib/go/bin
+    export GOPATH=/home/ubuntu/go
+    export PATH=/home/ubuntu/bin:/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin
+    go get -u k8s.io/test-infra/kubetest
 }
 
 function populate-kube-env () {
@@ -63,24 +55,33 @@ function populate-kube-env () {
     sed -i "s/KUBE_TEST_REPO_LIST=/&\/home\/ubuntu\/run-e2e\/repo-list.yaml/" run-e2e/kube-env
 }
 
+function taint-node () {
+    kubectl taint nodes $LINUX_NODE key=value:NoSchedule
+    kubectl label nodes linux1 node-role.kubernetes.io/master=NoSchedule
+}
+
 function start-tests () {
     pushd run-e2e
         set -x
         source kube-env
-        export KUBECTL_PATH=$(which kubectl)
-        focus=$(cat focus)
-        skip=$(cat skip)
+        focus=$(cat focus | sed 's:\\\\:\\:g')
+        skip=$(cat skip | sed 's:\\\\:\\:g')
         mkdir -p results
-        pushd kubernetes
+        pushd ~/go/src/k8s.io/kubernetes
+            # apply custom commits
+            git remote add e2e-win https://github.com/e2e-win/kubernetes
+            git fetch e2e-win
+            git cherry-pick -n cb68f5ef9990dd93d6db719cd17ee8b7cbf2f5d4
+
             kubetest --ginkgo-parallel=4 --verbose-commands=true --provider=local --test \
-                --test_args="--ginkgo.dryRun=false --ginkgo.focus=$(eval $focus) --ginkgo.skip=$(eval $skip)" --dump=../results/ \
-                | tee ../results/kubetest.log
+                --test_args="--ginkgo.dryRun=false --ginkgo.focus=$focus --ginkgo.skip=$skip" --dump=~/run-e2e/results/ \
+                | tee ~/run-e2e/results/kubetest.log
         popd
     popd
 }
 
 function main () {
-    TEMP=$(getopt -o i:k::d::a::p: --long k8s-master-ip:,id-rsa: -n '' -- "$@")
+    TEMP=$(getopt -o i:k:d: --long k8s-master-ip:,id-rsa:,linux-node: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -94,17 +95,17 @@ function main () {
                 K8S_MASTER_IP="$2";    shift 2;;
             --id-rsa)
                 ID_RSA="$2";           shift 2;;
+            --linux-node)
+                LINUX_NODE="$2";       shift 2;;
             --) shift ; break ;;
         esac
     done
 
     configure-kubectl
-    install-docker
-    clone-k8s
     build-k8s-parts
-    install-bazel
-    build-kubetest
+    get-kubetest
     populate-kube-env
+    taint-node
     start-tests
 }
 
