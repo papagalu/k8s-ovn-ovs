@@ -101,7 +101,7 @@ function populate-ansible-hosts () {
 
 function enable-ansible-log () {
     pushd ~/ovn-kubernetes/contrib
-        echo "log_path=/var/log/ansible.log" >> ansible.cfg
+        echo "log_path=~/ansible.log" >> ansible.cfg
     popd
 }
 
@@ -155,13 +155,11 @@ export PATH=/usr/lib/go/bin:$PATH:/home/ubuntu/go/bin;
 }
 
 function install-docker () {
-    if [[ $(program_is_installed docker) != "1" ]]; then
-        echo "Installing docker"
-        DEBIAN_FRONTEND=noninteractive sudo apt-get install docker.io -y
+   echo "Installing docker"
+   DEBIAN_FRONTEND=noninteractive sudo apt-get install docker.io -y
 
-        echo "Adding user $USER to docker group"
-        sudo usermod -a -G docker $USER
-    fi
+   echo "Adding user $USER to docker group"
+   sudo usermod -a -G docker $USER
 }
 
 function build-k8s-binaries () {
@@ -211,6 +209,10 @@ function deploy-k8s-cluster () {
     popd
 }
 
+function restart-ovn-watcher () {
+    ssh -i ~/id_rsa ${LINUX_NODES[0]} "sudo systemctl restart ovn-k8s-watcher"
+}
+
 function main () {
     TEMP=$(getopt -o r: --long report: -n 'ansible-script.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
@@ -242,6 +244,7 @@ function main () {
     install-docker
     build-k8s-binaries
     deploy-k8s-cluster
+    restart-ovn-watcher
 }
 
 main "$@"
