@@ -223,7 +223,7 @@ function prepare-tests () {
 }
 
 function main() {
-    TEMP=$(getopt -o c:x::d::a::b: --long config:,clean::,down::,ansible::,admin-openrc: -n '' -- "$@")
+    TEMP=$(getopt -o c:x::d::a::b: --long config:,down::,up::,test::,admin-openrc: -n '' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -235,12 +235,12 @@ function main() {
         case "$1" in
             --config)
                 CONFIG="$2";             shift 2;;
-            --clean)
-                CLEAN="true";            shift 2;;
             --down)
                 DOWN="true";             shift 2;;
-            --ansible)
-                ANSIBLE_MASTER="true";   shift 2;;
+            --up)
+                UP="true";               shift 2;;
+            --test)
+                TEST="true";             shift 2;;
             --admin-openrc)
                 OPENSTACK_ADMIN="$2"
                 source $OPENSTACK_ADMIN; shift 2;;
@@ -249,19 +249,17 @@ function main() {
     done
 
     read-config "$CONFIG"
+    delete-previous-cluster
     if [[ $DOWN == "true" ]]; then
-        delete-previous-cluster
         exit 0
     fi
-    if [[ $CLEAN == "true" ]]; then
-        delete-previous-cluster
-        echo ""
-    fi
-    create-cluster
-    wait-windows-nodes
-    if [[ $ANSIBLE_MASTER == "true" ]]; then
+    if [[ $UP == "true" ]]; then
+        create-cluster
+        wait-windows-nodes
         generate-report "$REPORT_FILE"
         prepare-ansible-node "$REPORT_FILE"
+    fi
+    if [[ $TEST == "true" ]]; then
         prepare-tests
     fi
 
