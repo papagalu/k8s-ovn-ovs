@@ -29,6 +29,7 @@ def parse_args():
     p.add('--cluster-name', help="Name of cluster.")
     p.add('--k8s-repo', default="http://github.com/kubernetes/kubernetes")
     p.add('--k8s-branch', default="master")
+    p.add('--workspace', default="/tmp/k8s-ovn-ovs")
     
     opts = p.parse_known_args()
 
@@ -53,13 +54,13 @@ def main():
             ci.up()
         if opts.test == True:
             success = ci.test()
+    except Exception as e:
+        print e
+    finally:
+        ci.collectWindowsLogs()
         if opts.down == True:
             ci.down()
         return success
-    except Exception as e:
-        print e
-        if opts.down == True:
-            ci.down() 
 
 if __name__ == "__main__":
     main()

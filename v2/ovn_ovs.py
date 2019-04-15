@@ -288,8 +288,7 @@ class OVN_OVS_CI(ci.CI):
             raise Exception("Ansible failed to run command %s on machine %s with error: %s" % (cmd, machine, out))
 
     def _prepullImages(self):
-        # TO DO: This path should be passed as param
-        prepull_script="/tmp/k8s-ovn-ovs/v2/prepull.ps1"
+        prepull_script = os.path.join(self.opts.workspace, "v2", "prepull.ps1")
         for vm in self._get_windows_vms():
             self.logging.info("Copying prepull script to node %s" % vm["name"])
             self._copyTo(prepull_script, "c:\\", vm["name"], windows=True)
@@ -327,7 +326,18 @@ class OVN_OVS_CI(ci.CI):
         except:
 	    self.logging.error("Failed to prepare test env")
             raise e
-	
+
+
+    def collectWindowsLogs(self):
+        collect_logs_script = os.path.join(self.opts.workspace, "v2", "collect-logs.ps1")
+        for vm in self._get_windows_vms():
+            logs_vm_path = os.path.join(self.opts.log_path, "%s.zip" %(vm["name"]))
+            self.logging.info("Copying collect-logs script to node %s" % vm["name"])
+            self._copyTo(collect_logs_script, "c:\\", vm["name"], windows=True)
+            self._runRemoteCmd("c:\\collect-logs.ps1 -Destination C:\\k", vm["name"], windows=True)
+            self._copyFrom("C:\\k\\logs.zip", logs_vm_path, vm["name"], windows=True)
+
+
     def up(self):
         self.logging.info("Bringing cluster up.")
         try:

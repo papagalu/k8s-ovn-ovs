@@ -221,6 +221,7 @@ def main():
         cmd.append("--configfile=%s" % job_config_file)
         cmd.append("--cluster-name=%s" % cluster_name)
         cmd.append("--log-path=%s" % log_paths["artifacts"])
+        cmd.append("--workspace=%s" % JOB_REPO_CLONE_DST)
 
         ret = call(cmd, cwd=os.path.join(JOB_REPO_CLONE_DST,"v2"))
         success = not int(ret)

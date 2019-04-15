@@ -113,6 +113,7 @@ class CI(object):
                                                                                              })
         return subprocess.call(cmd, cwd=utils.get_k8s_folder())
 
+
     def test(self):
         self._prepareTestEnv()
         self._prepareTests()
